@@ -24,11 +24,7 @@ WIKIPEDIA_JS_DS_NAME = "passages-c400-jawiki-20230403"
 WIKIPEDIA_JA_EMB_DS = "hotchpotch/wikipedia-passages-jawiki-embeddings"
 
 EMB_MODEL_PQ = {
-    "intfloat/multilingual-e5-small": 96,
-    "intfloat/multilingual-e5-base": 192,
-    "intfloat/multilingual-e5-large": 256,
-    "cl-nagoya/sup-simcse-ja-base": 192,
-    "pkshatech/GLuCoSE-base-ja": 192,
+    "multilingual-e5-large": 256,
 }
 
 EMB_MODEL_NAMES = list(EMB_MODEL_PQ.keys())
@@ -39,8 +35,8 @@ OPENAI_MODEL_NAMES = [
 ]
 
 E5_QUERY_TYPES = [
-    "passage",
     "query",
+    "passage",
 ]
 
 DEFAULT_QA_PROMPT = """
@@ -61,16 +57,6 @@ Responses must be given in Japanese.
 """.strip()
 
 
-if os.getenv("SPACE_ID"):
-    USE_HF_SPACE = True
-    os.environ["HF_HOME"] = "/data/.huggingface"
-    os.environ["HF_DATASETS_CACHE"] = "/data/.huggingface"
-else:
-    USE_HF_SPACE = False
-
-# for tokenizer
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
 
@@ -88,7 +74,7 @@ def get_model(name: str, max_seq_length=512):
 
 @st.cache_resource
 def get_wikija_ds(name: str = WIKIPEDIA_JS_DS_NAME):
-    ds = load_dataset(path=WIKIPEDIA_JA_DS, name=name, split="train")
+    ds = load_dataset('json',data_files="wikipedia_passages_c400_jawiki_20230403.jsonl", split="train")
     return ds
 
 
@@ -96,13 +82,10 @@ def get_wikija_ds(name: str = WIKIPEDIA_JS_DS_NAME):
 def get_faiss_index(
     index_name: str, ja_emb_ds: str = WIKIPEDIA_JA_EMB_DS, name=WIKIPEDIA_JS_DS_NAME
 ):
-    target_path = f"faiss_indexes/{name}/{index_name}"
-    dm = DownloadManager()
-    index_local_path = dm.download(
-        f"https://huggingface.co/datasets/{ja_emb_ds}/resolve/main/{target_path}"
-    )
+
+    index_local_path = "./outputs/faiss_indexes/multilingual-e5-large-passage/index_IVF256_PQ64.faiss"
     index = faiss.read_index(index_local_path)
-    index.nprobe = 128
+    # index.nprobe = 128
     return index
 
 
@@ -200,23 +183,19 @@ def to_df(scores, passages):
 
 
 def app():
-    st.title("Wikipedia 日本語 - RAGを使った検索Q&A")
-    md_text = """
-    [RAG用途に使える、Wikipedia 日本語の embeddings とベクトル検索用の faiss index を作った](https://secon.dev/entry/2023/12/04/080000-wikipedia-ja-embeddings/) の検索 & 質疑応答Q&Aのデモです。Wikipedia 2023年4月3日時点のデータを使用しています。
-    """
-    st.markdown(md_text)
+    st.title("Demo")
 
     st.text_area(
         "Question",
         key="question",
-        value="楽曲『約束はいらない』でデビューした、声優は誰?",
+        value="OpenAIに関して教えて?",
     )
     if not OPENAI_API_KEY:
         st.text_input(
             "OpenAI API Key",
             key="openai_api_key",
             type="password",
-            placeholder="※ OpenAI API Key 未入力時は回答を生成せずに、検索のみ実行します",
+            placeholder="※ OpenAI API Key 未入力時は回答を生成せずに、検索のみ",
         )
     else:
         st.session_state.openai_api_key = OPENAI_API_KEY
